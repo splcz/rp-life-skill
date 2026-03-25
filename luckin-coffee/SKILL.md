@@ -7,7 +7,7 @@ description: 瑞幸咖啡下单 skill。Use when the user explicitly mentions "�
 
 帮助用户在瑞幸咖啡下单，选择饮品后完成支付。
 
-**本 skill 不依赖任何 MCP 工具。** 创单和支付 API 调用均由本 skill 通过 Shell (curl) 直接完成。签名环节委托给支付 skill（可插拔）。
+**本 skill 不依赖任何 MCP 工具。** 创单和支付 API 调用均由本 skill 通过 shell 命令（curl）直接完成。签名环节委托给支付 skill（可插拔）。
 
 ## 触发条件
 
@@ -21,28 +21,19 @@ description: 瑞幸咖啡下单 skill。Use when the user explicitly mentions "�
 
 ### 第一步：选择饮品
 
-使用 AskQuestion 工具让用户选择咖啡品种：
+**向用户展示选择框，让用户从以下饮品中选择：**
 
-```
-AskQuestion:
-  title: "瑞幸咖啡 · 选择饮品"
-  questions:
-    - id: "product"
-      prompt: "请选择您想喝的咖啡 ☕"
-      options:
-        - id: "coconut_latte"
-          label: "🥥 生椰拿铁"
-        - id: "light_americano"
-          label: "☀️ 浅烘美式"
-        - id: "orange_americano"
-          label: "🍊 橙C美式"
-```
+| 选项 ID | 描述 |
+|---------|------|
+| `coconut_latte` | 🥥 生椰拿铁 |
+| `light_americano` | ☀️ 浅烘美式 |
+| `orange_americano` | 🍊 橙C美式 |
 
 用户选择后，记住所选饮品名称（如"生椰拿铁"），在后续流程中展示。
 
 ### 第二步：创建订单（直接调用 API）
 
-通过 Shell 工具执行 curl 命令创建订单。**不使用任何 MCP 工具。**
+通过 shell 命令执行 curl 创建订单。**不使用任何 MCP 工具。**
 
 #### 2.1 创建订单
 
@@ -70,7 +61,7 @@ curl -s -D - "上一步获取的paymentUrl"
 
 此请求将返回 HTTP 402 状态码。从**响应头**中提取 `payment-required` 字段值（Base64 编码的 JSON）。
 
-将 `payment-required` 头的值记录为 **paymentRequiredBase64**，然后用 Shell 解码查看内容：
+将 `payment-required` 头的值记录为 **paymentRequiredBase64**，然后解码查看内容：
 
 ```bash
 echo "paymentRequiredBase64的值" | base64 -d
@@ -101,27 +92,20 @@ echo "paymentRequiredBase64的值" | base64 -d
 
 ### 第三步：选择支付方式
 
-根据 `accepts` 数组中的 `network` 字段，动态构建 AskQuestion 选项。
+根据 `accepts` 数组中的 `network` 字段，动态构建选项。
 
 规则：
 - `network` 以 `eip155:` 开头 → "x402 数字货币支付 (EVM 链上)"
 - `network` 为 `redotpay:balance` → "RedotPay 余额支付"
 - 其他 → 显示原始 network 值
 
-**使用 AskQuestion 工具弹出选择框。** 即使当前只有一个选项也必须弹出，让用户确认：
+**向用户展示选择框。** 即使当前只有一个选项也必须展示，让用户确认：
 
-```
-AskQuestion:
-  title: "选择支付方式"
-  questions:
-    - id: "payment_method"
-      prompt: "请选择支付方式（{amount} {asset}）"
-      options:
-        - id: "0"
-          label: "{network 对应的描述} — {amount} {asset}"
-```
+| 选项 ID | 描述 |
+|---------|------|
+| `0` | {network 对应的描述} — {amount} {asset} |
 
-其中 `id` 对应 `accepts` 数组的索引。
+其中选项 ID 对应 `accepts` 数组的索引。
 
 ### 第四步：检查支付依赖（自动）
 
@@ -134,24 +118,37 @@ AskQuestion:
 如果**没有找到**，执行以下操作：
 
 1. 告诉用户："订单已创建，支付前需要安装支付签名组件，正在自动安装…"
-2. 通过 Shell 执行安装：
+2. 执行安装命令（自动检测当前 Agent 类型）：
+
 ```bash
-npx skills add splcz/rp-wallet-skill -g -a cursor -y
+npx skills add splcz/rp-wallet-skill -g -y
 ```
-3. 安装完成后，用 Read 工具读取对应的 SKILL.md 获取签名指令：
-   - eip155 支付：读取 `~/.cursor/skills/redotpay-web3-payment/SKILL.md`
-   - redotpay:balance 支付：读取 `~/.cursor/skills/redotpay-balance-payment/SKILL.md`
+
+> 支持的 Agent 和对应 Skill 目录：
+>
+> | Agent | Skill 安装目录 |
+> |-------|---------------|
+> | Cursor | `~/.cursor/skills/` |
+> | OpenClaw | `~/.openclaw/skills/` |
+> | Claude Code | `~/.claude/skills/` |
+
+3. 安装完成后，读取对应的 SKILL.md 获取签名指令：
+   - eip155 支付：读取 `redotpay-web3-payment/SKILL.md`
+   - redotpay:balance 支付：读取 `redotpay-balance-payment/SKILL.md`
 4. 按照读取到的 SKILL.md 中的指令执行签名流程
 
 #### 4.2 检查 MCP Server
 
-用 Read 工具读取 `~/.cursor/mcp.json`，检查是否已配置 `redotpay-usdc`。
+检查当前 Agent 是否已配置 `redotpay-usdc` MCP 服务器。
 
-如果**没有配置**：
+**各平台 MCP 配置方式：**
 
-1. 告诉用户："还需要配置签名 MCP Server，正在自动配置…"
-2. 读取当前 `~/.cursor/mcp.json` 内容（文件可能不存在）
-3. 向 `mcpServers` 中添加：
+| Agent | 配置文件 | 配置内容 |
+|-------|---------|---------|
+| Cursor | `~/.cursor/mcp.json` | 添加到 `mcpServers` 字段 |
+| OpenClaw | `~/.openclaw/openclaw.json` | 添加到 `mcpServers` 字段 |
+
+MCP 服务器配置内容（所有平台通用）：
 ```json
 {
   "redotpay-usdc": {
@@ -160,10 +157,16 @@ npx skills add splcz/rp-wallet-skill -g -a cursor -y
   }
 }
 ```
-4. 写入文件后，告诉用户：**"MCP 已配置，请重启 Cursor（Cmd+Shift+P → Reload Window）后重新说"来杯瑞幸"即可继续。订单已过期不影响，会重新创建。"**
+
+如果**没有配置**：
+
+1. 告诉用户："还需要配置签名 MCP Server，正在自动配置…"
+2. 读取当前 MCP 配置文件内容（文件可能不存在）
+3. 将上述 `redotpay-usdc` 配置写入对应的配置文件
+4. 写入文件后，告诉用户：**"MCP 已配置，请重启 Agent 后重新说"来杯瑞幸"即可继续。订单已过期不影响，会重新创建。"**
 5. **停止当前流程**，等待用户重启后重新触发
 
-> 如果 MCP 已配置但调用 `sign_payment` 工具时报错（如 MCP 未启动），同样提示用户重启 Cursor。
+> 如果 MCP 已配置但调用 `sign_payment` 工具时报错（如 MCP 未启动），同样提示用户重启 Agent。
 
 ### 第五步：委托签名（可插拔）
 
@@ -192,7 +195,7 @@ npx skills add splcz/rp-wallet-skill -g -a cursor -y
 
 ### 第六步：发起支付（直接调用 API）
 
-拿到支付 skill 返回的 **paymentSignatureBase64** 后，通过 Shell 工具直接发起支付请求：
+拿到支付 skill 返回的 **paymentSignatureBase64** 后，通过 shell 命令直接发起支付请求：
 
 ```bash
 curl -s -D - "paymentUrl" \
