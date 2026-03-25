@@ -10,17 +10,20 @@
 
 ## 安装
 
-将 Skill 复制到 `~/.cursor/skills/`：
+### 方式一：一键安装（推荐）
+
+```bash
+npx skills add splcz/rp-life-skill -g -a cursor -y
+```
+
+### 方式二：手动安装
 
 ```bash
 git clone https://github.com/splcz/rp-life-skill.git
-cd rp-life-skill
-
-mkdir -p ~/.cursor/skills/luckin-coffee
-cp luckin-coffee/SKILL.md ~/.cursor/skills/luckin-coffee/SKILL.md
+cp -r rp-life-skill/luckin-coffee ~/.cursor/skills/luckin-coffee
 ```
 
-重启 Cursor（或 Reload Window）生效。
+安装后重启 Cursor（或 Reload Window）生效。
 
 ## 使用
 
@@ -56,14 +59,15 @@ Agent 会弹出饮品选择 → 创建订单 → 选择支付方式 → 完成�
 ### 2. 安装支付 Skill
 
 ```bash
+npx skills add splcz/rp-wallet-skill -g -a cursor -y
+```
+
+或手动安装：
+
+```bash
 git clone https://github.com/splcz/rp-wallet-skill.git
-cd rp-wallet-skill
-
-mkdir -p ~/.cursor/skills/redotpay-web3-payment
-cp web3-payment/SKILL.md ~/.cursor/skills/redotpay-web3-payment/SKILL.md
-
-mkdir -p ~/.cursor/skills/redotpay-balance-payment
-cp balance-payment/SKILL.md ~/.cursor/skills/redotpay-balance-payment/SKILL.md
+cp -r rp-wallet-skill/web3-payment ~/.cursor/skills/redotpay-web3-payment
+cp -r rp-wallet-skill/balance-payment ~/.cursor/skills/redotpay-balance-payment
 ```
 
 安装完成后重启 Cursor。
